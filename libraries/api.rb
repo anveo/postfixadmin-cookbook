@@ -10,7 +10,8 @@ module PostfixAdmin
 
     def self.request(method, path, body, ssl=false)
       proto = ssl ? 'https' : 'http'
-      port = ssl ? 443 : 80
+      # FIXME: port should be customizable
+      port = ssl ? 443 : 8080
       uri = URI.parse("#{proto}://localhost:#{port}#{path}")
       http = Net::HTTP.new(uri.host, uri.port)
       if ssl
