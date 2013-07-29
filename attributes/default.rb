@@ -4,6 +4,8 @@ default['postfixadmin']['url'] = "http://downloads.sourceforge.net/project/postf
 default['postfixadmin']['checksum'] = 'ea505281b6c04bda887eb4e6aa6c023b354c4ef4864aa60dcb1425942bf2af63'
 
 default['postfixadmin']['server_name'] = 'postfixadmin.onddo.com' # change this
+default['postfixadmin']['port'] = 80
+default['postfixadmin']['ssl_port'] = 443
 default['postfixadmin']['ssl'] = false
 default['postfixadmin']['setup_password'] = nil # randomly generated
 default['postfixadmin']['setup_password_salt'] = nil # required for chef-solo

@@ -144,9 +144,9 @@ web_app 'postfixadmin' do
   server_name node['postfixadmin']['server_name']
   server_aliases []
   if node['postfixadmin']['ssl']
-    port '443'
+    port node['postfixadmin']['ssl_port']
   else
-    port '80'
+    port node['postfixadmin']['port']
   end
   enable true
 end
