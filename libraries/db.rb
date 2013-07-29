@@ -6,14 +6,17 @@ rescue LoadError
 end
 
 module PostfixAdmin
-  class MySQL
+  class DB
 
-    def initialize(user, password, dbname, host='127.0.0.1', port=3306)
+    def initialize(adapter, user, password, dbname, host='127.0.0.1', port=5432)
+      @adapter = adapter
+      @adapter = "postgres" if adapter == "postgresql"
       @user = user
       @password = password
       @dbname = dbname
       @host = host
       @port = port
+      @uri = "#{@adapter}://#{@user}:#{@password}@#{@host}:#{@port}/#{@dbname}"
       load_depends
     end
 
@@ -26,12 +29,7 @@ module PostfixAdmin
     end
 
     def connect
-      @db = Sequel.mysql(
-        :host => @host,
-        :user => @user,
-        :password => @password,
-        :database => @dbname
-      )
+      @db = Sequel.connect(@uri)
     end
 
     def disconnect
