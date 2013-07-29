@@ -22,8 +22,6 @@
 
 include_recipe 'apache2::default'
 include_recipe 'apache2::mod_php5'
-include_recipe 'database::mysql'
-include_recipe 'mysql::server'
 
 pkg_php_mysql = value_for_platform(
   %w(centos redhat scientific fedora amazon) => {
@@ -62,18 +60,11 @@ package pkg_php_mbstring do
   action :install
 end
 
+# TODO: CentOS compatibility
+package "php5-pgsql"
+
+chef_gem 'pg'
 chef_gem 'sequel'
-
-mysql_connection_info = {
-  :host => node['postfixadmin']['database']['host'],
-  :username => 'root',
-  :password => node['mysql']['server_root_password']
-}
-
-mysql_database node['postfixadmin']['database']['name'] do
-  connection mysql_connection_info
-  action :create
-end
 
 if Chef::Config[:solo]
   if node['postfixadmin']['database']['password'].nil?
@@ -94,13 +85,41 @@ else
   node.save
 end
 
-mysql_database_user node['postfixadmin']['database']['user'] do
-  connection mysql_connection_info
-  database_name node['postfixadmin']['database']['name']
-  host node['postfixadmin']['database']['host']
-  password node['postfixadmin']['database']['password']
-  privileges [:all]
-  action :grant
+if node['postfixadmin']['database']['adapter'] == 'mysql'
+  include_recipe 'database::mysql'
+  include_recipe 'mysql::server'
+
+  mysql_connection_info = {
+    :host => node['postfixadmin']['database']['host'],
+    :username => 'root',
+    :password => node['mysql']['server_root_password']
+  }
+
+  mysql_database node['postfixadmin']['database']['name'] do
+    connection mysql_connection_info
+    action :create
+  end
+
+  mysql_database_user node['postfixadmin']['database']['user'] do
+    connection mysql_connection_info
+    database_name node['postfixadmin']['database']['name']
+    host node['postfixadmin']['database']['host']
+    password node['postfixadmin']['database']['password']
+    privileges [:all]
+    action :grant
+  end
+else
+  pg_user node['postfixadmin']['database']['user'] do
+    privileges :superuser => false, :createdb => false, :login => true
+    password node['postfixadmin']['database']['password']
+  end
+
+  pg_database node['postfixadmin']['database']['name'] do
+    owner node['postfixadmin']['database']['user']
+    encoding "utf8"
+    template "template0"
+    locale "en_US.UTF8"
+  end
 end
 
 ark 'postfixadmin' do
