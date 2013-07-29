@@ -14,6 +14,7 @@ depends 'apache2'
 depends 'ark'
 depends 'database'
 depends 'mysql'
+depends 'postgresql'
 
 recipe 'postfixadmin::default', 'Installs and configures PostfixAdmin'
 recipe 'postfixadmin::map_files', 'Installs PostfixAdmin SQL map files to be used by Postfix'
@@ -185,12 +186,12 @@ attribute 'postfixadmin/map_files/list',
   :type => 'array',
   :required => 'optional',
   :default => [
-    'mysql_virtual_alias_maps.cf',
-    'mysql_virtual_alias_domain_maps.cf',
-    'mysql_virtual_alias_domain_catchall_maps.cf',
-    'mysql_virtual_domains_maps.cf',
-    'mysql_virtual_mailbox_maps.cf',
-    'mysql_virtual_alias_domain_mailbox_maps.cf',
-    'mysql_virtual_mailbox_limit_maps.cf',
+    'db_virtual_alias_maps.cf',
+    'db_virtual_alias_domain_maps.cf',
+    'db_virtual_alias_domain_catchall_maps.cf',
+    'db_virtual_domains_maps.cf',
+    'db_virtual_mailbox_maps.cf',
+    'db_virtual_alias_domain_mailbox_maps.cf',
+    'db_virtual_mailbox_limit_maps.cf',
   ]
 

@@ -153,13 +153,13 @@ Attributes
     <td><code>node['postfixadmin']['map_files']['list']</code></td>
     <td>An array with map file names to generate</td>
     <td><code>[<br/>
-      &nbsp;&nbsp;"mysql_virtual_alias_maps.cf",<br/>
-      &nbsp;&nbsp;"mysql_virtual_alias_domain_maps.cf",<br/>
-      &nbsp;&nbsp;"mysql_virtual_alias_domain_catchall_maps.cf",<br/>
-      &nbsp;&nbsp;"mysql_virtual_domains_maps.cf",<br/>
-      &nbsp;&nbsp;"mysql_virtual_mailbox_maps.cf",<br/>
-      &nbsp;&nbsp;"mysql_virtual_alias_domain_mailbox_maps.cf",<br/>
-      &nbsp;&nbsp;"mysql_virtual_mailbox_limit_maps.cf"<br/>
+      &nbsp;&nbsp;"db_virtual_alias_maps.cf",<br/>
+      &nbsp;&nbsp;"db_virtual_alias_domain_maps.cf",<br/>
+      &nbsp;&nbsp;"db_virtual_alias_domain_catchall_maps.cf",<br/>
+      &nbsp;&nbsp;"db_virtual_domains_maps.cf",<br/>
+      &nbsp;&nbsp;"db_virtual_mailbox_maps.cf",<br/>
+      &nbsp;&nbsp;"db_virtual_alias_domain_mailbox_maps.cf",<br/>
+      &nbsp;&nbsp;"db_virtual_mailbox_limit_maps.cf"<br/>
       ]</code></td>
   </tr>
 </table>
