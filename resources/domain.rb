@@ -7,10 +7,12 @@ attribute :aliases, :kind_of => Integer, :default => 10
 attribute :mailboxes, :kind_of => Integer, :default => 10
 attribute :login_username, :kind_of => String, :required => true
 attribute :login_password, :kind_of => String, :required => true
+attribute :db_adapter, :kind_of => String
 attribute :db_user, :kind_of => String
 attribute :db_password, :kind_of => String
 attribute :db_name, :kind_of => String
 attribute :db_host, :kind_of => String
+attribute :db_port, :kind_of => String
 attribute :ssl, :kind_of => [ TrueClass, FalseClass ]
 
 

@@ -11,8 +11,10 @@ default['postfixadmin']['setup_password'] = nil # randomly generated
 default['postfixadmin']['setup_password_salt'] = nil # required for chef-solo
 default['postfixadmin']['setup_password_encrypted'] = nil # randomly generated
 
+default['postfixadmin']['database']['adapter'] = 'mysql' # postgresql, myqsl
 default['postfixadmin']['database']['name'] = 'postfix'
 default['postfixadmin']['database']['host'] = 'localhost'
 default['postfixadmin']['database']['user'] = 'postfix'
 default['postfixadmin']['database']['password'] = nil # randomly generated
+default['postfixadmin']['database']['port'] = 3306
 
