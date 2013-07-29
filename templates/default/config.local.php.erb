@@ -4,7 +4,7 @@
 $CONF['configured'] = true;
 $CONF['setup_password'] = '<%= @setup_password %>';
 
-$CONF['database_type'] = 'mysqli';
+$CONF['database_type'] = '<%= node['postfixadmin']['database']['adapter'] == 'mysql' ? 'mysqli' : 'pgsql' %>';
 $CONF['database_host'] = '<%= @host %>';
 $CONF['database_user'] = '<%= @user %>';
 $CONF['database_password'] = '<%= @password %>';
