@@ -1,8 +1,10 @@
+# encoding: UTF-8
 #
 # Cookbook Name:: postfixadmin
 # Recipe:: default
-#
-# Copyright 2013, Onddo Labs, Sl.
+# Author:: Xabier de Zuazo (<xabier@zuazo.org>)
+# Copyright:: Copyright (c) 2013-2015 Onddo Labs, SL.
+# License:: Apache License, Version 2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,135 +21,152 @@
 
 ::Chef::Recipe.send(:include, Opscode::OpenSSL::Password)
 ::Chef::Recipe.send(:include, PostfixAdmin::PHP)
+::Chef::Recipe.send(:include, Chef::EncryptedAttributesHelpers)
 
-include_recipe 'apache2::default'
-include_recipe 'apache2::mod_php5'
-include_recipe 'database::mysql'
-include_recipe 'mysql::server'
-
-pkg_php_mysql = value_for_platform(
-  %w(centos redhat scientific fedora amazon) => {
-    %w(5.0 5.1 5.2 5.3 5.4 5.5 5.6 5.7 5.8 5.9) => 'php53-mysql',
-    'default' => 'php-mysql'
-  },
-  'default' => 'php5-mysql'
-)
-
-pkg_php_imap = value_for_platform(
-  %w(centos redhat scientific fedora amazon) => {
-    %w(5.0 5.1 5.2 5.3 5.4 5.5 5.6 5.7 5.8 5.9) => 'php53-imap',
-    'default' => 'php-imap'
-  },
-  'default' => 'php5-imap'
-)
-
-pkg_php_mbstring = value_for_platform(
-  %w(centos redhat scientific fedora amazon) => {
-    %w(5.0 5.1 5.2 5.3 5.4 5.5 5.6 5.7 5.8 5.9) => 'php53-mbstring',
-    'default' => 'php-mbstring'
-  },
-  'default' => nil
-)
-
-package pkg_php_mysql do
-  action :install
+if %w(centos).include?(node['platform']) && node['platform_version'].to_i >= 7
+  include_recipe 'yum-epel' # required for php-imap
 end
 
-package pkg_php_imap do
-  action :install
+db_type = node['postfixadmin']['database']['type']
+
+pkgs_php_db =
+  if db_type != 'requirements' && node['postfixadmin']['packages'].key?(db_type)
+    node['postfixadmin']['packages'][db_type]
+  else
+    fail "Unknown database type: #{db_type}"
+  end
+pkgs_php_db.each do |pkg|
+  package pkg do
+    action :install
+  end
 end
 
-package pkg_php_mbstring do
-  not_if do pkg_php_mbstring.nil? end
-  action :install
+node['postfixadmin']['packages']['requirements'].each do |pkg|
+  package pkg do
+    action :install
+  end
 end
+
+self.encrypted_attributes_enabled = node['postfixadmin']['encrypt_attributes']
+
+db_password =
+  encrypted_attribute_write(%w(postfixadmin database password)) do
+    secure_password
+  end
+setup_password =
+  encrypted_attribute_write(%w(postfixadmin setup_password)) do
+    secure_password
+  end
+setup_password_encrypted =
+  encrypted_attribute_write(%w(postfixadmin setup_password_encrypted)) do
+    encrypt_setup_password(setup_password, generate_setup_password_salt)
+  end
 
 chef_gem 'sequel'
 
-mysql_connection_info = {
-  :host => node['postfixadmin']['database']['host'],
-  :username => 'root',
-  :password => node['mysql']['server_root_password']
-}
-
-mysql_database node['postfixadmin']['database']['name'] do
-  connection mysql_connection_info
-  action :create
+if node['postfixadmin']['database']['manage'].nil?
+  node.default['postfixadmin']['database']['manage'] =
+    %w(localhost 127.0.0.1).include?(node['postfixadmin']['database']['host'])
 end
 
-if Chef::Config[:solo]
-  if node['postfixadmin']['database']['password'].nil?
-    Chef::Application.fatal!("You must set node['postfixadmin']['database']['password'] in chef-solo mode.");
-  end
-  if node['postfixadmin']['setup_password'].nil?
-    Chef::Application.fatal!("You must set node['postfixadmin']['setup_password'] in chef-solo mode.");
-  end
-  if node['postfixadmin']['setup_password_salt'].nil?
-    Chef::Application.fatal!("You must set node['postfixadmin']['setup_password_salt'] in chef-solo mode.");
-  end
-  node.set_unless['postfixadmin']['setup_password_encrypted'] = encrypt_setup_password(node['postfixadmin']['setup_password'], node['postfixadmin']['setup_password_salt'])
-else
-  # generate required passwords
-  node.set_unless['postfixadmin']['database']['password'] = secure_password
-  node.set_unless['postfixadmin']['setup_password'] = secure_password
-  node.set_unless['postfixadmin']['setup_password_encrypted'] = encrypt_setup_password(node['postfixadmin']['setup_password'], generate_setup_password_salt)
-  node.save
-end
+if node['postfixadmin']['database']['manage']
+  include_recipe "postfixadmin::#{db_type}"
 
-mysql_database_user node['postfixadmin']['database']['user'] do
-  connection mysql_connection_info
-  database_name node['postfixadmin']['database']['name']
-  host node['postfixadmin']['database']['host']
-  password node['postfixadmin']['database']['password']
-  privileges [:all]
-  action :grant
-end
+  case db_type
+  when 'mysql'
+
+    mysql2_chef_gem 'default' do
+      action :install
+    end
+
+    mysql_connection_info = {
+      host: node['postfixadmin']['database']['host'],
+      username: 'root',
+      password: encrypted_attribute_read(
+        %w(postfixadmin mysql server_root_password)
+      )
+    }
+
+    mysql_database node['postfixadmin']['database']['name'] do
+      connection mysql_connection_info
+      action :create
+    end
+
+    mysql_database_user node['postfixadmin']['database']['user'] do
+      connection mysql_connection_info
+      database_name node['postfixadmin']['database']['name']
+      host node['postfixadmin']['database']['host']
+      password db_password
+      privileges [:all]
+      action :grant
+    end
+
+  when 'postgresql'
+
+    include_recipe 'postgresql::ruby'
+
+    postgresql_connection_info = {
+      host: '127.0.0.1',
+      username: 'postgres',
+      password: node['postgresql']['password']['postgres']
+    }
+
+    postgresql_database node['postfixadmin']['database']['name'] do
+      connection postgresql_connection_info
+      action :create
+    end
+
+    postgresql_database_user node['postfixadmin']['database']['user'] do
+      connection postgresql_connection_info
+      database_name node['postfixadmin']['database']['name']
+      host node['postfixadmin']['database']['host']
+      password db_password
+      privileges [:all]
+      action [:create, :grant]
+    end
+
+    # Based on @phlipper work from:
+    # https://github.com/phlipper/chef-postgresql
+    language = 'plpgsql'
+    dbname = node['postfixadmin']['database']['name']
+    execute "createlang #{language} #{dbname}" do
+      user 'postgres'
+      not_if "psql -c 'SELECT lanname FROM pg_catalog.pg_language' #{dbname} "\
+        "| grep '^ #{language}$'", user: 'postgres'
+    end
+
+  else
+    fail "Unknown database type: #{db_type}"
+  end
+end # if manage database
 
 ark 'postfixadmin' do
-  url node['postfixadmin']['url']
+  url node['postfixadmin']['url'] % { version: node['postfixadmin']['version'] }
   version node['postfixadmin']['version']
   checksum node['postfixadmin']['checksum']
 end
 
-if node['postfixadmin']['ssl']
-  include_recipe 'apache2::mod_ssl'
-  package 'ssl-cert' # generates a self-signed (snakeoil) certificate
+web_server = node['postfixadmin']['web_server']
+if %w(apache nginx).include?(web_server)
+  include_recipe "postfixadmin::#{web_server}"
+  web_group = node[web_server]['group']
+else
+  web_group = nil
 end
 
 template 'config.local.php' do
   path "#{node['ark']['prefix_root']}/postfixadmin/config.local.php"
   source 'config.local.php.erb'
   owner 'root'
-  group node['apache']['group']
+  group web_group
   mode '0640'
   variables(
-    :name => node['postfixadmin']['database']['name'],
-    :host => node['postfixadmin']['database']['host'],
-    :user => node['postfixadmin']['database']['user'],
-    :password => node['postfixadmin']['database']['password'],
-    :setup_password => node['postfixadmin']['setup_password_encrypted'],
-    :conf => node['postfixadmin']['conf']
+    db_type: db_type,
+    db_host: node['postfixadmin']['database']['host'],
+    db_user: node['postfixadmin']['database']['user'],
+    db_password: db_password,
+    db_name: node['postfixadmin']['database']['name'],
+    setup_password: setup_password_encrypted,
+    conf: node['postfixadmin']['conf']
   )
 end
-
-# required by the lwrps
-ruby_block 'web_app-postfixadmin-reload' do
-  block {}
-  subscribes :create, 'execute[a2ensite postfixadmin.conf]', :immediately
-  notifies :reload, 'service[apache2]', :immediately
-end
-
-web_app 'postfixadmin' do
-  cookbook 'postfixadmin'
-  template 'vhost.erb'
-  docroot "#{node['ark']['prefix_root']}/postfixadmin"
-  server_name node['postfixadmin']['server_name']
-  server_aliases []
-  if node['postfixadmin']['ssl']
-    port '443'
-  else
-    port '80'
-  end
-  enable true
-end
-

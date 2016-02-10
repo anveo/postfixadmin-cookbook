@@ -1,67 +1,97 @@
 ---
-driver_plugin: vagrant
+driver:
+  name: vagrant
+  vm_hostname: 'postfixadmin.local'
+  network:
+  - ["forwarded_port", {guest: 80, host: 8080, auto_correct: true}]
+  - ["forwarded_port", {guest: 443, host: 8443, auto_correct: true}]
+
+provisioner:
+  require_chef_omnibus: true
+  data_path: test/shared
 
 platforms:
-- name: ubuntu-12.04
-  driver_config:
-    box: opscode-ubuntu-12.04
-    box_url: https://opscode-vm.s3.amazonaws.com/vagrant/opscode_ubuntu-12.04_chef-11.4.4.box
 - name: ubuntu-10.04
-  driver_config:
-    box: opscode-ubuntu-10.04
-    box_url: https://opscode-vm.s3.amazonaws.com/vagrant/opscode_ubuntu-10.04_chef-11.4.4.box
-- name: centos-6.4
-  driver_config:
-    box: opscode-centos-6.4
-    box_url: https://opscode-vm.s3.amazonaws.com/vagrant/opscode_centos-6.4_chef-11.4.4.box
-- name: centos-5.9
-  driver_config:
-    box: opscode-centos-5.9
-    box_url: https://opscode-vm.s3.amazonaws.com/vagrant/opscode_centos-5.9_chef-11.4.4.box
-- name: debian-6.0-chef11
-  driver_config:
-    box: debian-6.0.7-chef_11.4.4-2-amd64
-    box_url: https://onddo-vm.s3.amazonaws.com/vagrant/debian-6.0.7-chef_11.4.4-2-amd64.box
-- name: debian-7.0-chef10
-  driver_config:
-    box: debian-7.0.0-chef_10.26.0-1-amd64
-    box_url: https://onddo-vm.s3.amazonaws.com/vagrant/debian-7.0.0-chef_10.26.0-1-amd64.box
-- name: debian-7.0-chef11
-  driver_config:
-    box: debian-7.0.0-chef_11.4.4-2-amd64
-    box_url: https://onddo-vm.s3.amazonaws.com/vagrant/debian-7.0.0-chef_11.4.4-2-amd64.box
+  run_list: ["recipe[apt]"]
+- name: ubuntu-12.04
+  run_list: ["recipe[apt]"]
+- name: ubuntu-14.04
+  run_list: ["recipe[apt]"]
+- name: ubuntu-15.04
+  run_list: ["recipe[apt]"]
+- name: debian-6.0.10
+  run_list: ["recipe[apt]"]
+- name: debian-7.8
+  run_list: ["recipe[apt]"]
+- name: debian-8.1
+  run_list: ["recipe[apt]"]
+- name: centos-5.11
+  run_list: ["recipe[selinux::disabled]"]
+- name: centos-6.6
+  run_list: ["recipe[selinux::disabled]"]
+- name: fedora-20
+  run_list: ["recipe[selinux::disabled]"]
 
 suites:
-- name: default
+- name: mysql
+  run_list:
+  - recipe[postfixadmin_test::default]
+- name: postgresql
+  excludes:
+  # https://github.com/hw-cookbooks/postgresql/issues/249
+  - ubuntu-10.04
+  - ubuntu-12.04
+  - ubuntu-15.04
+  - debian-6.0.10
+  - debian-7.8
+  - fedora-20
+  run_list:
+  - recipe[postfixadmin_test::default]
+  attributes:
+    postfixadmin:
+      database:
+        type: postgresql
+- name: nginx
+  excludes:
+  # a conflict between mysql and php-fpm packages
+  - centos-5.11
+  # php-fpm cookbook error: No such file or directory - /sbin/status
+  - ubuntu-15.04
   run_list:
   - recipe[postfixadmin_test]
-  attributes: {
-    mysql: {
-      server_root_password: vagrant,
-      server_debian_password: vagrant_debian,
-      server_repl_password: vagrant_repl
-    },
-    postfixadmin: {
-      database: {
-        password: postfix_pass
-      },
-      setup_password: admin,
-      setup_password_salt: salt
-    }
-  }
+  attributes:
+    postfixadmin:
+      web_server: nginx
+- name: without-webserver
+  excludes:
+  # some dependency installs apache2
+  - ubuntu-10.04
+  - debian-6.0.10
+  run_list:
+  - recipe[postfixadmin_test]
+  attributes:
+    postfixadmin:
+      web_server: false
 - name: map_files
   run_list:
+  - recipe[postfix-full]
   - recipe[postfixadmin_test::map_files]
-  attributes: { }
-- name: lwrp
+- name: ssl
+  excludes:
+  # apache2::mod_ssl not compatible
+  - centos-5.11
   run_list:
-  - recipe[postfixadmin_test::lwrp]
-  attributes: { }
-- name: lwrp_ssl
-  run_list:
-  - recipe[postfixadmin_test::lwrp]
-  attributes: {
-    postfixadmin: {
+  - recipe[postfixadmin_test::default]
+  attributes:
+    postfixadmin:
       ssl: true
-    }
-  }
+- name: ssl-port
+  excludes:
+  # apache2::mod_ssl not compatible
+  - centos-5.11
+  run_list:
+  - recipe[postfixadmin_test::default]
+  attributes:
+    postfixadmin:
+      port: 8443
+      ssl: true

@@ -1,138 +1,79 @@
-
-require 'uri'
-require 'net/http'
-require 'chef/rest/rest_request'
+# encoding: UTF-8
+#
+# Cookbook Name:: postfixadmin
+# Library:: api
+# Author:: Xabier de Zuazo (<xabier@zuazo.org>)
+# Copyright:: Copyright (c) 2013 Onddo Labs, SL.
+# License:: Apache License, Version 2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 module PostfixAdmin
-  module API
-    @@cookie = nil
-    @@authenticated = false
-
-    def self.request(method, path, body, ssl=false)
-      proto = ssl ? 'https' : 'http'
-      port = ssl ? 443 : 80
-      uri = URI.parse("#{proto}://localhost:#{port}#{path}")
-      http = Net::HTTP.new(uri.host, uri.port)
-      if ssl
-        require 'net/https'
-        http.use_ssl = true
-        http.verify_mode = OpenSSL::SSL::VERIFY_NONE
-      end
-      # http.set_debug_output $stderr # DEBUG
-
-      case method.downcase
-      when 'post'
-        request = Net::HTTP::Post.new(uri.request_uri)
-        request['Content-Type'] = 'application/x-www-form-urlencoded'
-      else
-        request = Net::HTTP::Get.new(uri.request_uri)
-      end
-      request['User-Agent'] = Chef::REST::RESTRequest.user_agent
-      unless @@cookie.nil?
-        request['Cookie'] = @@cookie
-      end
-      request.set_form_data(body) unless body.nil?
-
-      response = http.request(request)
-      if response['Set-Cookie'].kind_of?(String)
-        @@cookie = response['set-cookie'].split(';')[0]
-        Chef::Log.debug("#{self.name}##{__method__.to_s} cookie: #{@@cookie}")
-      end
-      if (response.code.to_i >= 400)
-        error_msg = "#{self.name}##{__method__.to_s}: #{response.code} #{response.message}"
-        Chef::Log.fatal(error_msg)
-        raise error_msg
-      elsif response.body.match(/^.*class=['"]error_msg['"][^>]*>([^<]*)<.*$/)
-        error_msg = response.body.gsub(/^.*class=['"]error_msg['"][^>]*>([^<]*)<.*$/m, '\1')
-        Chef::Log.fatal("#{self.name}##{__method__.to_s}: #{error_msg}")
-        raise "#{self.name}##{__method__.to_s}"
-      elsif response.body.match(/^.*class=['"]standout['"][^>]*>([^<]*)<.*$/)
-        return response.body.gsub(/^.*class=['"]standout['"][^>]*>([^<]*)<.*$/m, '\1')
-      end
-      return nil
+  # Static class to make PostfixAdmin API calls
+  class API
+    def initialize(ssl = false, port = nil, username = nil, password = nil)
+      @http = API::HTTP.new(username, password, ssl, port)
     end
 
-    def self.get(path, ssl=false)
-      request('get', path, nil, ssl)
+    def create_admin(username, password, setup_password)
+      @http.setup(username, password, setup_password)
     end
 
-    def self.post(path, body, ssl=false)
-      request('post', path, body, ssl)
-    end
-
-    def self.index(ssl=false)
-      get('/login.php', ssl)
-    end
-
-    def self.setup(body, ssl=false)
-      post('/setup.php', body, ssl)
-    end
-
-    def self.login(username, password, ssl=false)
-      unless @@authenticated
-        index(ssl)
-        body = {
-          'fUsername' => username,
-          'fPassword' => password,
-          'lang' => 'en',
-          'submit' => 'Login',
-        }
-        post('/login.php', body, ssl)
-        @@authenticated = true
-      end
-    end
-
-    def self.createAdmin(username, password, setup_password, ssl=false)
+    def create_domain(domain, description, aliases, mailboxes)
       body = {
-        'form' => 'createadmin',
-        'setup_password' => setup_password,
-        'fUsername' => username,
-        'fPassword' => password,
-        'fPassword2' => password,
-        'submit' => 'Add+Admin',
+        fDomain: domain,
+        fDescription: description,
+        fAliases: aliases,
+        fMailboxes: mailboxes,
+        submit: 'Add+Domain'
       }
-      setup(body, ssl)
+      @http.post('/create-domain.php', body)
     end
 
-    def self.createDomain(domain, description, aliases, mailboxes, login_username, login_password, ssl=false)
-      login(login_username, login_password, ssl)
+    # rubocop:disable Metrics/ParameterLists
+    def create_mailbox(username, domain, password, name, active, mail)
+      # rubocop:enable Metrics/ParameterLists
       body = {
-        'fDomain' => domain,
-        'fDescription' => description,
-        'fAliases' => aliases,
-        'fMailboxes' => mailboxes,
-        'submit' => 'Add+Domain',
+        fUsername: username,
+        fDomain: domain,
+        fPassword: password, fPassword2: password,
+        fName: name,
+        submit: 'Add+Mailbox'
       }
-      post('/create-domain.php', body, ssl)
+      body['fActive'] = 'on' if active
+      body['fMail'] = 'on' if mail
+      @http.post('/create-mailbox.php', body)
     end
 
-    def self.createMailbox(username, domain, password, name, active, mail, login_username, login_password, ssl=false)
-      login(login_username, login_password, ssl)
+    def create_alias(address, domain, goto, active)
       body = {
-        'fUsername' => username,
-        'fDomain' => domain,
-        'fPassword' => password,
-        'fPassword2' => password,
-        'fName' => name,
-        'submit' => 'Add+Mailbox',
+        fAddress: address,
+        fDomain: domain,
+        fGoto: goto,
+        submit: 'Add+Alias'
       }
-      body['fActive'] = 'on' if (active)
-      body['fMail'] = 'on' if (mail)
-      post('/create-mailbox.php', body, ssl)
+      body['fActive'] = 'on' if active
+      @http.post('/create-alias.php', body)
     end
 
-    def self.createAlias(address, domain, goto, active, login_username, login_password, ssl=false)
-      login(login_username, login_password, ssl)
+    def create_alias_domain(alias_domain, target_domain, active)
       body = {
-        'fAddress' => address,
-        'fDomain' => domain,
-        'fGoto' => goto,
-        'submit' => 'Add+Alias',
+        alias_domain: alias_domain,
+        target_domain: target_domain,
+        submit: 'Add+Alias+Domain'
       }
-      body['fActive'] = 'on' if (active)
-      post('/create-alias.php', body, ssl)
+      body['active'] = '1' if active
+      @http.post('/create-alias-domain.php', body)
     end
-
   end
 end
-
