@@ -21,7 +21,7 @@
 
 Chef::Recipe.send(:include, Chef::EncryptedAttributesHelpers)
 # include the #secure_password method:
-Chef::Recipe.send(:include, Opscode::OpenSSL::Password)
+Chef::Recipe.send(:include, OpenSSLCookbook::Password)
 
 def mysql_password(user)
   key = "server_#{user}_password"

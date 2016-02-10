@@ -19,7 +19,7 @@
 # limitations under the License.
 #
 
-::Chef::Recipe.send(:include, Opscode::OpenSSL::Password)
+::Chef::Recipe.send(:include, OpenSSLCookbook::Password)
 ::Chef::Recipe.send(:include, PostfixAdmin::PHP)
 ::Chef::Recipe.send(:include, Chef::EncryptedAttributesHelpers)
 
