@@ -41,7 +41,7 @@ supports 'fedora'
 supports 'ubuntu'
 
 depends 'apache2', '~> 3.0'
-depends 'ark', '~> 0.9'
+depends 'ark'
 depends 'database', '~> 4.0'
 depends 'encrypted_attributes', '~> 0.2'
 depends 'mysql', '~> 6.0'
